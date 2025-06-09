@@ -11,7 +11,8 @@ const nextConfig = {
       'framerusercontent.com',
       'www.3ds.com',
       'gcs.yourdatasmarter.com',
-      'cdn.prod.website-files.com'
+      'cdn.prod.website-files.com',
+      'images.pexels.com'
     ],
   },
 };

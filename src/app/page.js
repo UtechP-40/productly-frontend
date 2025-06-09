@@ -9,7 +9,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 
 import { useKeenSlider } from 'keen-slider/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState,useCallback } from 'react';
 import 'keen-slider/keen-slider.min.css';
 
 const images = [
@@ -26,27 +26,28 @@ function Slideshow() {
   const autoplayTimer = useRef(null);
 
   const [sliderRef, slider] = useKeenSlider({
-    loop: true,
-    mode: "free-snap",
-    slides: { perView: 1 },
-    created() {
-      startAutoplay();
-    },
-    dragStart() {
-      clearTimeout(autoplayTimer.current);
-    },
-    dragEnd() {
-      startAutoplay();
-    },
-  });
-
-  function startAutoplay() {
-    if (isHovered) return;
+  loop: true,
+  mode: "free-snap",
+  slides: { perView: 1 },
+  created() {
+    startAutoplay();
+  },
+  dragStart() {
     clearTimeout(autoplayTimer.current);
-    autoplayTimer.current = setTimeout(() => {
-      slider.current?.next();
-    }, 3000);
-  }
+  },
+  dragEnd() {
+    startAutoplay();
+  },
+});
+
+
+  const startAutoplay = useCallback(() => {
+  if (isHovered) return;
+  clearTimeout(autoplayTimer.current);
+  autoplayTimer.current = setTimeout(() => {
+    slider.current?.next();
+  }, 3000);
+}, [isHovered, slider]); // ✅ include dependencies!
 
   useEffect(() => {
     if (!sliderRef.current) return;
@@ -71,7 +72,7 @@ function Slideshow() {
       sliderEl.removeEventListener("mouseleave", onMouseLeave);
       clearTimeout(autoplayTimer.current);
     };
-  }, [sliderRef, isHovered]);
+  }, [sliderRef, isHovered,startAutoplay]);
 
   return (
     <div
@@ -81,7 +82,9 @@ function Slideshow() {
     >
       {images.map((src, i) => (
         <div className="keen-slider__slide" key={i}>
-          <img
+          <Image
+          width={400}
+          height={550}
             src={src}
             alt={`Slide ${i + 1}`}
             className="object-cover w-full h-full"
@@ -260,7 +263,7 @@ export default function Home() {
               transition={{ duration: 0.5 }}
               viewport={{ once: true }}
             >
-              <p className="text-lg mb-4">"Productly has transformed our field operations. The AI assistant and real-time tracking are game-changers."</p>
+              <p className="text-lg mb-4">&quot;Productly has transformed our field operations. The AI assistant and real-time tracking are game-changers.&quot;</p>
               <p className="text-sm font-semibold">John Doe, Field Agent</p>
             </motion.div>
             <motion.div
@@ -270,7 +273,7 @@ export default function Home() {
               transition={{ duration: 0.5, delay: 0.2 }}
               viewport={{ once: true }}
             >
-              <p className="text-lg mb-4">"Managing our team with Productly has been a game-changer. The intuitive interface and powerful features make it easy to track progress."</p>
+              <p className="text-lg mb-4">&quot;Managing our team with Productly has been a game-changer. The intuitive interface and powerful features make it easy to track progress.&quot;</p>
               <p className="text-sm font-semibold">Jane Smith, Manager</p>
             </motion.div>
           </div>

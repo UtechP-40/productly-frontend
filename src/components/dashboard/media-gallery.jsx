@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
+import Image from 'next/image';
 import { 
   Camera, 
   Video, 
@@ -259,7 +260,9 @@ export function MediaGallery() {
           {filteredMedia.map((file) => (
             <Card key={file.id} className="bg-gray-900 border-gray-700 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer">
               <div className="relative">
-                <img
+                <Image
+                width={100}
+                height={480}
                   src={file.thumbnail}
                   alt={file.filename}
                   className="w-full h-48 object-cover rounded-t-lg"
@@ -351,7 +354,9 @@ export function MediaGallery() {
                   index !== filteredMedia.length - 1 ? 'border-b border-gray-700' : ''
                 }`}>
                   <div className="relative flex-shrink-0">
-                    <img
+                    <Image
+                    width={100}
+                    height={480}
                       src={file.thumbnail}
                       alt={file.filename}
                       className="w-16 h-12 object-cover rounded"

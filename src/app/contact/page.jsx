@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Navigation from '../../components/Navigation';
 import { motion } from 'framer-motion';
 
@@ -9,13 +9,15 @@ const fadeIn = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.7 } },
 };
 
-const ContactUs = ({ isAuthenticated = true }) => {
+export default function ContactUs() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     message: '',
   });
 
+  const isAuthenticated = true; 
+  
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
@@ -89,6 +91,4 @@ const ContactUs = ({ isAuthenticated = true }) => {
       </svg>
     </div>
   );
-};
-
-export default ContactUs;
+}
