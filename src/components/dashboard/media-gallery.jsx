@@ -115,7 +115,7 @@ export function MediaGallery() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterEmployee, setFilterEmployee] = useState('all');
-  const [selectedMedia, setSelectedMedia] = useState<any>(null);
+  const [selectedMedia, setSelectedMedia] = useState(null);
 
   const filteredMedia = mediaFiles.filter(file => {
     const matchesSearch = file.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||

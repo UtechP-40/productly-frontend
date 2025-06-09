@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Monitor } from 'lucide-react';
-import { Button } from "@/components/ui/button";
+import { Button } from "./ui/button";
 import Link from 'next/link';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
