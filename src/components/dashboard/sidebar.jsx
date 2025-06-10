@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Shield
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 
 export function DashboardSidebar({ 
   activeTab, 
@@ -103,7 +104,7 @@ export function DashboardSidebar({
   };
 
   return (
-    <div className={`fixed left-0 top-0 h-full bg-white border-r border-gray-300 transition-all duration-300 z-50 shadow-lg ${
+    <div className={`fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-50 shadow-sm ${
       collapsed ? 'w-16' : 'w-64'
     }`}>
       <div className="flex flex-col h-full">
@@ -124,7 +125,8 @@ export function DashboardSidebar({
               variant="ghost"
               size="icon"
               onClick={() => setCollapsed(!collapsed)}
-              className="h-8 w-8 text-white hover:bg-gray-800"
+              className="h-8 w-8 text-white hover:bg-gray-800 hover:text-white"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
             </Button>
@@ -132,56 +134,106 @@ export function DashboardSidebar({
         </div>
 
         {/* User Info */}
-        {!collapsed && (
+        {!collapsed ? (
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center space-x-3">
               <Avatar className="h-10 w-10 border-2 border-blue-200">
                 <AvatarImage src={currentUser.avatar} alt={currentUser.name} />
-                <AvatarFallback className="bg-blue-100 text-blue-900">{currentUser.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                <AvatarFallback className="bg-blue-100 text-blue-900">
+                  {currentUser.name.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-black truncate">{currentUser.name}</p>
+                <p className="text-sm font-medium text-gray-900 truncate">{currentUser.name}</p>
                 <div className="flex items-center space-x-2 mt-1">
                   <Badge className={`text-xs border ${getRoleBadgeColor(currentUser.role)}`}>
                     <Shield className="h-3 w-3 mr-1" />
-                    {currentUser.role}
+                    {currentUser.role.split('_').join(' ')}
                   </Badge>
                 </div>
               </div>
             </div>
           </div>
+        ) : (
+          <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-center">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Avatar className="h-10 w-10 border-2 border-blue-200 cursor-pointer">
+                    <AvatarImage src={currentUser.avatar} alt={currentUser.name} />
+                    <AvatarFallback className="bg-blue-100 text-blue-900">
+                      {currentUser.name.split(' ').map(n => n[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="p-2">
+                    <p className="font-medium">{currentUser.name}</p>
+                    <Badge className={`text-xs mt-1 ${getRoleBadgeColor(currentUser.role)}`}>
+                      {currentUser.role.split('_').join(' ')}
+                    </Badge>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 bg-white">
-          {filteredNavigation.map((item) => (
-            <Button
-              key={item.id}
-              variant={activeTab === item.id ? "default" : "ghost"}
-              className={`w-full justify-start ${
-                activeTab === item.id 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                  : 'text-black hover:text-blue-600 hover:bg-blue-50'
-              } ${collapsed ? 'px-2' : 'px-3'}`}
-              onClick={() => setActiveTab(item.id)}
-            >
-              {item.icon}
-              {!collapsed && <span className="ml-3">{item.label}</span>}
-            </Button>
-          ))}
+        <nav className="flex-1 overflow-y-auto py-2 px-1 bg-white">
+          <div className="space-y-1">
+            {filteredNavigation.map((item) => (
+              <TooltipProvider key={item.id} delayDuration={100}>
+                <Tooltip disableHoverableContent={!collapsed}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={activeTab === item.id ? "default" : "ghost"}
+                      className={`w-full justify-start transition-colors ${
+                        activeTab === item.id 
+                          ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' 
+                          : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
+                      } ${collapsed ? 'py-5' : 'px-3 py-4'}`}
+                      onClick={() => setActiveTab(item.id)}
+                    >
+                      <span className="flex items-center">
+                        {item.icon}
+                        {!collapsed && <span className="ml-3">{item.label}</span>}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  {collapsed && (
+                    <TooltipContent side="right" className="ml-2">
+                      {item.label}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            ))}
+          </div>
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 bg-white">
-          <Button
-            variant="ghost"
-            className={`w-full justify-start text-black hover:text-white hover:bg-black ${
-              collapsed ? 'px-2' : 'px-3'
-            }`}
-          >
-            <LogOut className="h-5 w-5" />
-            {!collapsed && <span className="ml-3">Sign Out</span>}
-          </Button>
+        <div className="p-2 border-t border-gray-200 bg-white">
+          <TooltipProvider delayDuration={100}>
+            <Tooltip disableHoverableContent={!collapsed}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start text-gray-700 hover:text-white hover:bg-red-500 ${
+                    collapsed ? 'px-3 py-5' : 'px-3 py-4'
+                  }`}
+                >
+                  <LogOut className="h-5 w-5" />
+                  {!collapsed && <span className="ml-3">Sign Out</span>}
+                </Button>
+              </TooltipTrigger>
+              {collapsed && (
+                <TooltipContent side="right" className="ml-2">
+                  Sign Out
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
     </div>

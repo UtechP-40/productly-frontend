@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { DashboardSidebar } from '../../components/dashboard/sidebar';
 import { LiveTrackingMap } from '../../components/dashboard/live-tracking-map';
-import { TaskKanban } from '../../components/dashboard/task-kanban';
+import  TaskKanban  from '../../components/dashboard/task-kanban';
 import { EmployeeDirectory } from '../../components/dashboard/employee-directory';
 import AITrainerModule from '../../components/dashboard/ai-trainer';
 import { InvitationManager } from '../../components/dashboard/invitation-manager';
