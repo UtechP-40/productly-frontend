@@ -8,10 +8,11 @@ import Navigation from "../../../components/Navigation";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
+import axios from "axios";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-// Main Register Component
 export default function RegisterPage() {
-  // Local state for the registration form
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -20,11 +21,10 @@ export default function RegisterPage() {
     confirmPassword: "",
     orgName: "",
     slug: "",
-    userType: "ADMIN_PORTAL", // Default selected type
+    userType: "ADMIN_PORTAL",
     agree: false,
   });
 
-  // Updates local state on input change
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({
@@ -33,12 +33,12 @@ export default function RegisterPage() {
     }));
   };
 
-  // Form submission handler (hook this to your API)
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.agree) return alert("Please agree to the terms.");
-    if (form.password !== form.confirmPassword) return alert("Passwords do not match.");
+    if (!form.agree) return toast.error("Please agree to the terms.");
+    if (form.password !== form.confirmPassword)
+      return toast.warning("Passwords do not match.");
 
     const userData = {
       firstName: form.firstName,
@@ -50,38 +50,43 @@ export default function RegisterPage() {
 
     const organizationData = {
       name: form.orgName,
-      slug: form.slug,
+      slug:
+        form.slug ||
+        form.orgName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+      email: form.email,
     };
 
+    const toastId = toast.loading("Registering user...");
+
     try {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userData, organizationData }),
+      const res = await axios.post("/api/register", {
+        userData,
+        organizationData,
       });
 
-      const result = await res.json();
+      toast.dismiss(toastId);
 
-      if (result.success) {
-        alert("Registration successful!");
-        // Redirect to login or dashboard
+      if (res.data.success) {
+        toast.success("Registration successful!");
+        setTimeout(() => {
+          window.location.href = "/auth/login";
+        }, 1500);
       } else {
-        alert(result.message || "Something went wrong.");
+        toast.error(res.data.message || "Registration failed.");
       }
     } catch (err) {
-      console.error(err);
-      alert("Server error.");
+      console.error("Registration error:", err);
+      toast.dismiss(toastId);
+      toast.error(err.response?.data?.message || "Server error occurred.");
     }
   };
 
   return (
     <div>
-      {/* Global Navigation (Not Authenticated) */}
       <Navigation isAuthenticated={false} />
+      <ToastContainer position="top-center" autoClose={3000} theme="colored" />
 
-      {/* Full Page Layout */}
       <div className="min-h-screen bg-white text-gray-900 flex">
-        {/* Left visual section with intro and image */}
         <div className="hidden md:flex w-1/2 relative">
           <Image
             src="https://images.unsplash.com/photo-1600476061596-a0815671e5c8?q=80&w=1887&auto=format&fit=crop"
@@ -103,7 +108,6 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Right section: Registration Form */}
         <div className="w-full md:w-1/2 flex items-center justify-center p-8">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
@@ -111,7 +115,6 @@ export default function RegisterPage() {
             transition={{ duration: 0.6 }}
             className="w-full max-w-md space-y-6"
           >
-            {/* Header */}
             <div>
               <h1 className="text-3xl font-bold mb-2">Create your account</h1>
               <p className="text-muted-foreground">
@@ -119,9 +122,7 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            {/* Actual Form */}
             <form className="space-y-4" onSubmit={handleSubmit}>
-              {/* Name fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="firstName">First Name</Label>
@@ -144,8 +145,6 @@ export default function RegisterPage() {
                   />
                 </div>
               </div>
-
-              {/* Email */}
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -157,8 +156,6 @@ export default function RegisterPage() {
                   onChange={handleChange}
                 />
               </div>
-
-              {/* Password */}
               <div>
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -170,8 +167,6 @@ export default function RegisterPage() {
                   onChange={handleChange}
                 />
               </div>
-
-              {/* Confirm Password */}
               <div>
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <Input
@@ -183,8 +178,6 @@ export default function RegisterPage() {
                   onChange={handleChange}
                 />
               </div>
-
-              {/* Organization Name */}
               <div>
                 <Label htmlFor="orgName">Organization Name</Label>
                 <Input
@@ -195,8 +188,6 @@ export default function RegisterPage() {
                   onChange={handleChange}
                 />
               </div>
-
-              {/* Slug (optional subdomain) */}
               <div>
                 <Label htmlFor="slug">Subdomain (optional)</Label>
                 <Input
@@ -206,8 +197,6 @@ export default function RegisterPage() {
                   onChange={handleChange}
                 />
               </div>
-
-              {/* User Role Type */}
               <div>
                 <Label htmlFor="userType">User Type</Label>
                 <select
@@ -222,8 +211,6 @@ export default function RegisterPage() {
                   <option value="EMPLOYEE_APP">Employee App</option>
                 </select>
               </div>
-
-              {/* Terms Agreement */}
               <div className="flex items-start space-x-2 text-sm">
                 <input
                   type="checkbox"
@@ -234,20 +221,19 @@ export default function RegisterPage() {
                   required
                 />
                 <span>
-                  I agree to the{" "}
+                  I agree to the {" "}
                   <Link href="/terms" className="text-primary hover:underline">
                     Terms & Conditions
                   </Link>
                 </span>
               </div>
-
-              {/* Submit Button */}
-              <Button size="lg" className="w-full mt-4">Register</Button>
+              <Button size="lg" className="w-full mt-4">
+                Register
+              </Button>
             </form>
 
-            {/* Already registered */}
             <p className="text-center text-muted-foreground text-sm">
-              Already have an account?{" "}
+              Already have an account? {" "}
               <Link href="/auth/login" className="text-primary hover:underline">
                 Login here
               </Link>
