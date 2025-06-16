@@ -4,14 +4,18 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
+import axios from "axios";
 import Navigation from "../../../components/Navigation";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { FcGoogle } from "react-icons/fc";
 
+import { ToastContainer, toast } from "react-toastify";
+
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "", remember: false });
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -23,33 +27,43 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Hook this to your API
+    setLoading(true);
+    const toastId = toast.loading("Registering user...");
     try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const result = await res.json();
-      if (result.success) {
-        alert("Login successful!");
-        // Redirect to dashboard or home
+      const res = await axios.post(
+        "/api/login",
+        { email: form.email, password: form.password },
+        { withCredentials: true }
+      );
+      toast.dismiss(toastId);
+      // console.log(res)
+      const data = res?.data?.data?.data
+      if (data?.accessToken) {
+        // alert("Login successful!");
+        // TODO: Redirect to dashboard
+        localStorage.setItem('accessToken', data?.accessToken)
+        toast.success("Login successful!");
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 1500);
       } else {
-        alert(result.message || "Login failed.");
+        // alert(res.data?.message || "Login failed.");
+        toast.error(res.data?.message || "Login failed.");
       }
     } catch (err) {
-      console.error(err);
-      alert("Server error. Please try again later.");
+      console.error("Registration error:", err);
+      toast.dismiss(toastId);
+      toast.error(err.response?.data?.message || "Server error occurred.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div>
       <Navigation isAuthenticated={false} />
-
+      <ToastContainer position="top-center" autoClose={3000} theme="colored" />
       <div className="min-h-screen bg-white text-gray-900 flex">
-        {/* Left image section */}
         <div className="hidden md:flex w-1/2 relative">
           <Image
             src="https://images.unsplash.com/photo-1702726001096-096efcf640b8?q=80&w=1635&auto=format&fit=crop"
@@ -71,7 +85,6 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Right login form section */}
         <div className="w-full md:w-1/2 flex items-center justify-center p-8">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
@@ -79,7 +92,6 @@ export default function Login() {
             transition={{ duration: 0.6 }}
             className="w-full max-w-md space-y-6"
           >
-            {/* Header */}
             <div>
               <h1 className="text-3xl font-bold mb-2">Login to Productly</h1>
               <p className="text-muted-foreground">
@@ -87,9 +99,7 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Form */}
             <form className="space-y-4" onSubmit={handleSubmit}>
-              {/* Email */}
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -103,7 +113,6 @@ export default function Login() {
                 />
               </div>
 
-              {/* Password */}
               <div>
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -117,7 +126,6 @@ export default function Login() {
                 />
               </div>
 
-              {/* Remember + Forgot password */}
               <div className="flex justify-between items-center text-sm">
                 <label className="flex items-center space-x-2">
                   <input
@@ -134,12 +142,10 @@ export default function Login() {
                 </Link>
               </div>
 
-              {/* Submit */}
-              <Button size="lg" className="w-full mt-4" type="submit">
-                Login
+              <Button size="lg" className="w-full mt-4" type="submit" disabled={loading}>
+                {loading ? "Logging in..." : "Login"}
               </Button>
 
-              {/* Divider */}
               <div className="relative py-4">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-300" />
@@ -149,7 +155,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Google login button (Hook into OAuth) */}
               <Button
                 variant="outline"
                 className="w-full flex items-center gap-2"
@@ -162,12 +167,10 @@ export default function Login() {
               </Button>
             </form>
 
-            {/* Security info */}
             <div className="text-xs text-center text-muted-foreground">
               🔒 Your credentials are securely encrypted.
             </div>
 
-            {/* Register CTA */}
             <p className="text-center text-muted-foreground text-sm">
               Don’t have an account?{" "}
               <Link href="/auth/register" className="text-primary hover:underline">
