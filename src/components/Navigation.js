@@ -1,15 +1,25 @@
 'use client';
 
 import React from 'react';
-import { Monitor } from 'lucide-react';
+import { Monitor, LogOut, User } from 'lucide-react';
 import { Button } from "./ui/button";
 import Link from 'next/link';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { usePathname } from 'next/navigation';
+import { useAuth } from '../hooks/useAuth';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
-function Navigation({ isAuthenticated }) {
+function Navigation() {
   const pathname = usePathname();
+  const { isAuthenticated, user, logout } = useAuth();
 
   const activeClass = 'text-[#1E3D76]'; 
 
@@ -54,6 +64,32 @@ function Navigation({ isAuthenticated }) {
                   Dashboard
                 </Link>
               </Button>
+              <li>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-full">
+                      <User className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>
+                      {user?.firstName} {user?.lastName}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile">Profile</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings">Settings</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => logout()} className="text-destructive">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </li>
             </>
           ) : (
             <>

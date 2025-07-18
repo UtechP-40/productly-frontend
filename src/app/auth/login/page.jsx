@@ -93,7 +93,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation isAuthenticated={false} />
+      <Navigation />
       <ToastContainer position="top-center" autoClose={3000} theme="colored" />
       
       <div className="flex min-h-[calc(100vh-64px)]">
