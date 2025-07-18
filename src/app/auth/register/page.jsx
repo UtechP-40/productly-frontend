@@ -8,9 +8,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { useAuth } from "../../../hooks/useAuth";
+import { usePasswordStrength, PasswordStrengthMeter, PasswordRequirements } from "../../../hooks/usePasswordStrength";
 
 // UI Components
 import Navigation from "../../../components/Navigation";
@@ -18,52 +19,51 @@ import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../../../components/ui/card";
+import { FiAlertCircle, FiLock, FiMail, FiUser } from "react-icons/fi";
 import { Alert, AlertDescription } from "../../../components/ui/alert";
-import { FiAlertCircle, FiLock, FiUser, FiMail, FiCheck, FiX } from "react-icons/fi";
-import { useAuth } from "../../../hooks/useAuth";
+import { Skeleton } from "../../../components/ui/skeleton";
 
-// Password strength validation schema
-const passwordSchema = z
-  .string()
-  .min(8, { message: "Password must be at least 8 characters" })
-  .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
-  .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
-  .regex(/[0-9]/, { message: "Password must contain at least one number" })
-  .regex(/[^A-Za-z0-9]/, { message: "Password must contain at least one special character" });
-
-// Registration form validation schema
+// Form validation schema
 const registerSchema = z.object({
-  firstName: z.string().min(1, { message: "First name is required" }),
-  lastName: z.string().min(1, { message: "Last name is required" }),
-  password: passwordSchema,
-  confirmPassword: z.string().min(1, { message: "Please confirm your password" }),
-  invitationToken: z.string().min(1, { message: "Invitation token is required" }),
-  agree: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to the terms and conditions" }),
-  }),
+  firstName: z
+    .string()
+    .min(1, { message: "First name is required" })
+    .max(50, { message: "First name cannot exceed 50 characters" }),
+  lastName: z
+    .string()
+    .min(1, { message: "Last name is required" })
+    .max(50, { message: "Last name cannot exceed 50 characters" }),
+  password: z
+    .string()
+    .min(8, { message: "Password must be at least 8 characters" })
+    .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
+    .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
+    .regex(/[0-9]/, { message: "Password must contain at least one number" })
+    .regex(/[^A-Za-z0-9]/, { message: "Password must contain at least one special character" }),
+  confirmPassword: z
+    .string()
+    .min(1, { message: "Please confirm your password" })
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
 });
 
-export default function RegisterPage() {
+export default function Register() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [invitationData, setInvitationData] = useState(null);
-  const [isVerifying, setIsVerifying] = useState(true);
-  const { login } = useAuth();
-  
-  // Get token from URL
   const token = searchParams.get("token");
   
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [invitationData, setInvitationData] = useState(null);
+  const [verificationStatus, setVerificationStatus] = useState("verifying"); // verifying, valid, invalid
+
   // Initialize form with react-hook-form and zod validation
   const {
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
     watch,
   } = useForm({
     resolver: zodResolver(registerSchema),
@@ -71,164 +71,129 @@ export default function RegisterPage() {
       firstName: "",
       lastName: "",
       password: "",
-      confirmPassword: "",
-      invitationToken: token || "",
-      agree: false,
-    },
+      confirmPassword: ""
+    }
   });
-  
-  // Watch password for strength indicator
-  const password = watch("password", "");
-  
-  // Calculate password strength
-  const getPasswordStrength = (password) => {
-    if (!password) return 0;
-    
-    let strength = 0;
-    if (password.length >= 8) strength += 1;
-    if (/[A-Z]/.test(password)) strength += 1;
-    if (/[a-z]/.test(password)) strength += 1;
-    if (/[0-9]/.test(password)) strength += 1;
-    if (/[^A-Za-z0-9]/.test(password)) strength += 1;
-    
-    return strength;
-  };
-  
-  const passwordStrength = getPasswordStrength(password);
-  
-  // Verify invitation token on component mount
+
+  // Get password strength
+  const password = watch("password");
+  const passwordStrength = usePasswordStrength(password);
+
+  // Get auth context
+  const { register: registerUser } = useAuth();
+
   useEffect(() => {
     const verifyInvitation = async () => {
       if (!token) {
-        setIsVerifying(false);
-        setError("No invitation token provided. Please use the link from your invitation email.");
+        setError("Invitation token is missing. Please check your invitation link.");
+        setVerificationStatus("invalid");
+        setIsLoading(false);
         return;
       }
-      
+
       try {
-        // Set the token in the form
-        setValue("invitationToken", token);
-        
-        // Verify the token with the API
-        const response = await axios.get(`/api/auth/verify-invitation?token=${token}`);
-        
-        if (response.data.success) {
-          setInvitationData(response.data.data);
-          // Pre-fill email from invitation
-          if (response.data.data.email) {
-            setValue("email", response.data.data.email);
-          }
+        const response = await fetch(`/api/auth/verify-invitation?token=${token}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          setInvitationData(result.data);
+          setVerificationStatus("valid");
         } else {
-          setError(response.data.message || "Invalid invitation token");
+          setError(result.message || "Invalid or expired invitation.");
+          setVerificationStatus("invalid");
+          toast.error(result.message || "Invalid or expired invitation.");
         }
       } catch (err) {
         console.error("Invitation verification error:", err);
-        setError(err.response?.data?.message || "Failed to verify invitation token");
+        setError("Failed to verify invitation. Please try again or contact support.");
+        setVerificationStatus("invalid");
+        toast.error("Failed to verify invitation. Please try again or contact support.");
       } finally {
-        setIsVerifying(false);
+        setIsLoading(false);
       }
     };
-    
+
     verifyInvitation();
-  }, [token, setValue]);
-  
+  }, [token]);
+
   // Form submission handler
   const onSubmit = async (data) => {
-    setIsLoading(true);
+    if (!token || !invitationData) {
+      setError("Invalid invitation. Please use a valid invitation link.");
+      toast.error("Invalid invitation. Please use a valid invitation link.");
+      return;
+    }
+
+    if (!passwordStrength.isStrong) {
+      setError("Please use a stronger password.");
+      toast.error("Please use a stronger password.");
+      return;
+    }
+
+    setIsSubmitting(true);
     setError("");
     
     try {
-      // Submit registration data
-      const response = await axios.post("/api/auth/register", {
+      const result = await registerUser({
         firstName: data.firstName,
         lastName: data.lastName,
+        email: invitationData.email, // Use email from invitation
         password: data.password,
-        invitationToken: data.invitationToken,
+        token: token
       });
-      
-      if (response.data.success) {
-        toast.success("Registration successful! Logging you in...");
+
+      if (result.success) {
+        toast.success("Registration successful! Redirecting to dashboard...");
         
-        // Try to log in automatically
-        try {
-          await login({
-            email: invitationData.email,
-            password: data.password,
-          });
-          
-          // Redirect to dashboard after short delay
-          setTimeout(() => {
-            router.push("/dashboard");
-          }, 1500);
-        } catch (loginErr) {
-          console.error("Auto-login error:", loginErr);
-          toast.info("Please log in with your new credentials");
-          
-          // Redirect to login page after short delay
-          setTimeout(() => {
-            router.push("/auth/login");
-          }, 1500);
-        }
+        // Short delay before redirect for better UX
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1500);
       } else {
-        setError(response.data.message || "Registration failed");
-        toast.error(response.data.message || "Registration failed");
+        setError(result.message || "Registration failed. Please try again.");
+        toast.error(result.message || "Registration failed. Please try again.");
       }
     } catch (err) {
       console.error("Registration error:", err);
-      setError(err.response?.data?.message || "An error occurred during registration");
-      toast.error(err.response?.data?.message || "An error occurred during registration");
+      const errorMessage = err.message || "An error occurred during registration. Please try again.";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
-  
-  // Password strength indicator
+
+  // Render password strength meter
   const renderPasswordStrength = () => {
-    const strengthLabels = ["Very Weak", "Weak", "Medium", "Strong", "Very Strong"];
-    const strengthColors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-green-400", "bg-green-600"];
+    if (!password) return null;
     
     return (
-      <div className="mt-1">
-        <div className="flex justify-between mb-1">
-          <span className="text-xs">{passwordStrength > 0 ? strengthLabels[passwordStrength - 1] : "No password"}</span>
-        </div>
-        <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div 
-            className={`h-full ${passwordStrength > 0 ? strengthColors[passwordStrength - 1] : ""}`}
-            style={{ width: `${passwordStrength * 20}%` }}
-          ></div>
-        </div>
+      <div className="mt-2">
+        <PasswordStrengthMeter strength={passwordStrength.score} />
+        <p className={`text-xs mt-1 ${
+          passwordStrength.isStrong ? "text-green-500" : "text-amber-500"
+        }`}>
+          {passwordStrength.isStrong 
+            ? "Password strength: Strong" 
+            : `Password strength: ${passwordStrength.feedback.warning || "Weak"}`}
+        </p>
       </div>
     );
   };
-  
-  // Password requirements list
+
+  // Render password requirements
   const renderPasswordRequirements = () => {
-    const requirements = [
-      { label: "At least 8 characters", test: password.length >= 8 },
-      { label: "At least one uppercase letter", test: /[A-Z]/.test(password) },
-      { label: "At least one lowercase letter", test: /[a-z]/.test(password) },
-      { label: "At least one number", test: /[0-9]/.test(password) },
-      { label: "At least one special character", test: /[^A-Za-z0-9]/.test(password) },
-    ];
+    if (!password) return null;
     
     return (
-      <div className="mt-2 space-y-1">
-        <p className="text-xs text-muted-foreground">Password requirements:</p>
-        <ul className="text-xs space-y-1">
-          {requirements.map((req, index) => (
-            <li key={index} className="flex items-center">
-              {req.test ? (
-                <FiCheck className="text-green-500 mr-1" size={12} />
-              ) : (
-                <FiX className="text-red-500 mr-1" size={12} />
-              )}
-              <span className={req.test ? "text-green-700" : "text-muted-foreground"}>
-                {req.label}
-              </span>
-            </li>
-          ))}
-        </ul>
+      <div className="mt-2">
+        <PasswordRequirements password={password} />
       </div>
     );
   };
@@ -242,8 +207,8 @@ export default function RegisterPage() {
         {/* Left side - Hero image (hidden on mobile) */}
         <div className="hidden md:flex w-1/2 relative">
           <Image
-            src="https://images.unsplash.com/photo-1600476061596-a0815671e5c8?q=80&w=1887&auto=format&fit=crop"
-            alt="Productly Field"
+            src="https://images.unsplash.com/photo-1702726001096-096efcf640b8?q=80&w=1635&auto=format&fit=crop"
+            alt="User workspace hero"
             fill
             className="object-cover"
             priority
@@ -274,7 +239,7 @@ export default function RegisterPage() {
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl font-bold">Complete Registration</CardTitle>
                 <CardDescription>
-                  {isVerifying ? (
+                  {isLoading ? (
                     "Verifying your invitation..."
                   ) : invitationData ? (
                     `Set up your account for ${invitationData.organizationName || "your organization"}`
@@ -285,17 +250,41 @@ export default function RegisterPage() {
               </CardHeader>
               
               <CardContent>
-                {isVerifying ? (
+                {isLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
                   </div>
-                ) : error ? (
-                  <Alert variant="destructive" className="mb-4">
-                    <FiAlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
+                ) : verificationStatus === "invalid" ? (
+                  <div className="flex flex-col items-center justify-center space-y-4 py-6">
+                    <div className="rounded-full bg-red-100 p-3">
+                      <FiAlertCircle className="h-10 w-10 text-red-600" />
+                    </div>
+                    <div className="text-center">
+                      <h3 className="text-xl font-medium">Invalid Invitation</h3>
+                      <p className="text-muted-foreground mt-2">{error || "This invitation link is invalid or has expired."}</p>
+                    </div>
+                    <div className="space-y-4 w-full max-w-md">
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => router.push("/auth/login")}
+                      >
+                        Go to Login
+                      </Button>
+                      <p className="text-center text-sm text-muted-foreground">
+                        If you believe this is an error, please contact your organization administrator.
+                      </p>
+                    </div>
+                  </div>
                 ) : (
                   <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    {error && (
+                      <Alert variant="destructive" className="mb-4">
+                        <FiAlertCircle className="h-4 w-4" />
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+                    
                     {invitationData && (
                       <Alert className="mb-4 bg-primary/10 border-primary/20">
                         <div className="flex flex-col">
@@ -395,36 +384,13 @@ export default function RegisterPage() {
                       )}
                     </div>
                     
-                    <div className="flex items-start space-x-2 text-sm">
-                      <input
-                        type="checkbox"
-                        id="agree"
-                        {...register("agree")}
-                        className="mt-1"
-                      />
-                      <Label htmlFor="agree" className="font-normal">
-                        I agree to the{" "}
-                        <Link href="/terms" className="text-primary hover:underline">
-                          Terms & Conditions
-                        </Link>
-                      </Label>
-                    </div>
-                    {errors.agree && (
-                      <p className="text-destructive text-xs">{errors.agree.message}</p>
-                    )}
-                    
-                    <Input
-                      type="hidden"
-                      {...register("invitationToken")}
-                    />
-                    
                     <Button
                       type="submit"
                       className="w-full"
                       size="lg"
-                      disabled={isLoading}
+                      disabled={isSubmitting}
                     >
-                      {isLoading ? "Creating Account..." : "Complete Registration"}
+                      {isSubmitting ? "Creating Account..." : "Complete Registration"}
                     </Button>
                   </form>
                 )}
