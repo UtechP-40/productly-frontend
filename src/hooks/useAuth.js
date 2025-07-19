@@ -1,175 +1,224 @@
-"use client";
+/**
+ * Authentication hook for managing user authentication state
+ * Provides login, register, logout, and session verification functionality
+ */
 
-import { createContext, useContext, useState, useEffect } from "react";
-import axios from "axios";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useContext, createContext } from 'react';
+import { useRouter } from 'next/navigation';
+import authApi from '../utils/authApi';
 
-// Create auth context
-const AuthContext = createContext({
-  user: null,
-  role: null,
-  isLoading: true,
-  isAuthenticated: false,
-  login: async () => {},
-  logout: async () => {},
-  refreshSession: async () => {},
-});
+// Create authentication context
+const AuthContext = createContext(null);
 
 /**
- * Auth Provider component to wrap the application
+ * AuthProvider component to wrap application with authentication context
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const router = useRouter();
 
-  // Fetch current user on mount
+  // Initialize authentication state on component mount
   useEffect(() => {
-    const checkAuth = async () => {
+    const initAuth = async () => {
       try {
-        const response = await axios.get("/api/auth/me");
-        if (response.data.success) {
-          setUser(response.data.data.user);
-          setRole(response.data.data.user.organizationRole);
-          setIsAuthenticated(true);
+        // Verify current session and get user data
+        const result = await authApi.verifySession(true);
+        
+        if (result.success && result.data.valid && result.data.user) {
+          setUser(result.data.user);
+          setRole(result.data.role);
+        } else {
+          setUser(null);
+          setRole(null);
         }
       } catch (error) {
-        console.error("Auth check error:", error);
+        console.error('Auth initialization error:', error);
         setUser(null);
         setRole(null);
-        setIsAuthenticated(false);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
+        setInitialized(true);
       }
     };
 
-    checkAuth();
+    initAuth();
   }, []);
 
   /**
-   * Login function
-   * @param {Object} credentials - User credentials
-   * @param {string} credentials.email - User email
-   * @param {string} credentials.password - User password
-   * @param {boolean} credentials.rememberMe - Remember me option
-   * @returns {Promise} Login result
+   * Login with email and password
+   * @param {Object} credentials - Login credentials
+   * @returns {Object} - Login result
    */
   const login = async (credentials) => {
-    setIsLoading(true);
+    setLoading(true);
+    
     try {
-      const response = await axios.post(
-        "/api/auth/login",
-        credentials,
-        { withCredentials: true }
-      );
-
-      if (response.data.success) {
-        // Fetch user data after successful login
-        await refreshSession();
-        return { success: true, data: response.data.data };
-      } else {
-        return { success: false, message: response.data.message };
+      const result = await authApi.login(credentials);
+      
+      if (result.success) {
+        setUser(result.data.user);
+        
+        // If role information is available
+        if (result.data.user?.organizationRole) {
+          // Fetch role details if not included in the response
+          try {
+            const sessionResult = await authApi.verifySession(true);
+            if (sessionResult.success && sessionResult.data.role) {
+              setRole(sessionResult.data.role);
+            }
+          } catch (roleError) {
+            console.error('Error fetching role details:', roleError);
+          }
+        }
       }
+      
+      return {
+        success: result.success,
+        message: result.message
+      };
     } catch (error) {
-      console.error("Login error:", error);
       return {
         success: false,
-        message: error.response?.data?.message || "Login failed"
+        message: error.message
       };
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   /**
-   * Logout function
+   * Register a new user with invitation token
+   * @param {Object} userData - User registration data
+   * @returns {Object} - Registration result
+   */
+  const register = async (userData) => {
+    setLoading(true);
+    
+    try {
+      const result = await authApi.register(userData);
+      
+      if (result.success) {
+        setUser(result.data.user);
+        
+        // If role information is available
+        if (result.data.organizationRole) {
+          setRole(result.data.organizationRole);
+        }
+      }
+      
+      return {
+        success: result.success,
+        message: result.message
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Logout the current user
    * @param {boolean} allSessions - Whether to logout from all sessions
-   * @returns {Promise} Logout result
+   * @returns {Object} - Logout result
    */
   const logout = async (allSessions = false) => {
-    setIsLoading(true);
+    setLoading(true);
+    
     try {
-      const response = await axios.post(
-        "/api/auth/logout",
-        { allSessions },
-        { withCredentials: true }
-      );
-
+      const result = await authApi.logout(allSessions);
+      
+      // Clear user state regardless of API result
       setUser(null);
       setRole(null);
-      setIsAuthenticated(false);
       
       // Redirect to login page
-      router.push("/auth/login");
+      router.push('/auth/login');
       
-      return { success: true };
+      return {
+        success: true,
+        message: result.message || 'Logout successful'
+      };
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error('Logout error:', error);
+      
+      // Still clear user state even if API call fails
+      setUser(null);
+      setRole(null);
+      
+      // Redirect to login page
+      router.push('/auth/login');
+      
       return {
         success: false,
-        message: error.response?.data?.message || "Logout failed"
+        message: error.message
       };
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   /**
-   * Refresh user session
-   * @returns {Promise} Session refresh result
+   * Check if user has a specific permission
+   * @param {string} permission - Permission to check
+   * @returns {boolean} - Whether user has the permission
    */
-  const refreshSession = async () => {
-    try {
-      const response = await axios.get("/api/auth/me");
-      if (response.data.success) {
-        setUser(response.data.data.user);
-        setRole(response.data.data.user.organizationRole);
-        setIsAuthenticated(true);
-        return { success: true };
-      } else {
-        setUser(null);
-        setRole(null);
-        setIsAuthenticated(false);
-        return { success: false, message: response.data.message };
-      }
-    } catch (error) {
-      console.error("Session refresh error:", error);
-      setUser(null);
-      setRole(null);
-      setIsAuthenticated(false);
-      return {
-        success: false,
-        message: error.response?.data?.message || "Session refresh failed"
-      };
+  const hasPermission = (permission) => {
+    if (!user || !role || !role.permissions) {
+      return false;
     }
+    
+    return role.permissions.some(p => 
+      typeof p === 'string' ? p === permission : p.name === permission
+    );
+  };
+
+  /**
+   * Check if user has a specific role
+   * @param {string} roleName - Role name to check
+   * @returns {boolean} - Whether user has the role
+   */
+  const hasRole = (roleName) => {
+    if (!user || !role) {
+      return false;
+    }
+    
+    return role.name === roleName;
   };
 
   // Context value
   const value = {
     user,
     role,
-    isLoading,
-    isAuthenticated,
+    loading,
+    initialized,
     login,
+    register,
     logout,
-    refreshSession,
+    hasPermission,
+    hasRole,
+    isAuthenticated: !!user
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 /**
- * Hook to use auth context
- * @returns {Object} Auth context
+ * Hook to use authentication context
+ * @returns {Object} - Authentication context
  */
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
+  
   return context;
 }
-
-export default useAuth;
