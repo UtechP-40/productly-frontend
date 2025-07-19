@@ -71,11 +71,38 @@ export default function Login() {
       });
 
       if (result.success) {
-        toast.success("Login successful! Redirecting to dashboard...");
+        toast.success("Login successful! Redirecting...");
+        
+        // Get the redirect URL from query parameters or sessionStorage
+        const searchParams = new URLSearchParams(window.location.search);
+        const from = searchParams.get('from');
+        
+        // Get the appropriate redirect URL
+        let redirectUrl = '/dashboard';
+        
+        if (from) {
+          // Decode and validate the URL
+          try {
+            const decodedPath = decodeURIComponent(from);
+            // Only allow relative URLs for security
+            if (decodedPath.startsWith('/') && !decodedPath.includes('://')) {
+              redirectUrl = decodedPath;
+            }
+          } catch (error) {
+            console.error('Error decoding redirect URL:', error);
+          }
+        } else {
+          // Check for stored redirect path
+          const storedPath = sessionStorage.getItem('redirectAfterLogin');
+          if (storedPath) {
+            redirectUrl = storedPath;
+            sessionStorage.removeItem('redirectAfterLogin');
+          }
+        }
         
         // Short delay before redirect for better UX
         setTimeout(() => {
-          router.push("/dashboard");
+          router.push(redirectUrl);
         }, 1500);
       } else {
         setError(result.message || "Login failed. Please try again.");
