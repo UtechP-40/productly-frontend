@@ -16,6 +16,7 @@ import { InvitationManager } from '../../components/dashboard/invitation-manager
 import { AnalyticsDashboard } from '../../components/dashboard/analytics';
 import { MediaGallery } from '../../components/dashboard/media-gallery';
 import { OrganizationSettings } from '../../components/dashboard/organization-settings';
+import { RoleManagement } from '../../components/dashboard/role-management';
 
 const currentUser = {
   id: '1',
@@ -147,6 +148,7 @@ export default function Dashboard() {
       case 'employees': return <EmployeeDirectory />;
       case 'ai-trainer': return <AITrainerModule />;
       case 'invitations': return <InvitationManager />;
+      case 'roles': return <RoleManagement />;
       case 'analytics': return <AnalyticsDashboard />;
       case 'media': return <MediaGallery />;
       case 'settings': return <OrganizationSettings />;
@@ -175,6 +177,7 @@ export default function Dashboard() {
                   {activeTab === 'employees' && 'Employee Directory'}
                   {activeTab === 'ai-trainer' && 'AI Assistant Trainer'}
                   {activeTab === 'invitations' && 'User Management'}
+                  {activeTab === 'roles' && 'Role Management'}
                   {activeTab === 'analytics' && 'Analytics & Reports'}
                   {activeTab === 'media' && 'Media Gallery'}
                   {activeTab === 'settings' && 'Organization Settings'}

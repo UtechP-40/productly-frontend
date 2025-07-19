@@ -65,6 +65,12 @@ export function DashboardSidebar({
       roles: ['OWNER', 'MANAGER']
     },
     {
+      id: 'roles',
+      label: 'Role Management',
+      icon: <Shield className="h-5 w-5" />,
+      roles: ['OWNER']
+    },
+    {
       id: 'analytics',
       label: 'Analytics',
       icon: <BarChart3 className="h-5 w-5" />,
