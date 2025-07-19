@@ -51,6 +51,12 @@ api.interceptors.response.use(
         // Session expired or unauthorized
         // You could trigger a logout or redirect to login here
         console.error('Authentication error: Session expired or unauthorized');
+        
+        // Dispatch a custom event for session expiry
+        const sessionExpiredEvent = new CustomEvent('session:expired', {
+          detail: { reason: 'unauthorized' }
+        });
+        document.dispatchEvent(sessionExpiredEvent);
       } else if (status === 403) {
         // Forbidden - user doesn't have permission
         console.error('Authorization error: Insufficient permissions');
@@ -232,6 +238,21 @@ const authApi = {
         },
         message: error.response?.data?.message || 'Password validation failed'
       };
+    }
+  },
+  
+  /**
+   * Refresh authentication token
+   * @returns {Promise} - API response
+   */
+  refreshToken: async () => {
+    try {
+      const response = await api.post('/refresh');
+      return response.data;
+    } catch (error) {
+      // Extract error message from response if available
+      const errorMessage = error.response?.data?.message || 'Failed to refresh token.';
+      throw new Error(errorMessage);
     }
   }
 };

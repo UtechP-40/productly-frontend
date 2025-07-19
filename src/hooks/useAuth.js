@@ -6,6 +6,7 @@
 import { useState, useEffect, useContext, createContext } from 'react';
 import { useRouter } from 'next/navigation';
 import authApi from '../utils/authApi';
+import sessionManager from '../utils/sessionManager';
 
 // Create authentication context
 const AuthContext = createContext(null);
@@ -18,6 +19,11 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [sessionInfo, setSessionInfo] = useState({
+    expiresAt: null,
+    timeRemaining: null,
+    showWarning: false
+  });
   const router = useRouter();
 
   // Initialize authentication state on component mount
@@ -30,6 +36,15 @@ export function AuthProvider({ children }) {
         if (result.success && result.data.valid && result.data.user) {
           setUser(result.data.user);
           setRole(result.data.role);
+          
+          // Initialize session manager
+          sessionManager.initialize({
+            sessionDuration: 30 * 60 * 1000, // 30 minutes
+            warningTime: 5 * 60 * 1000 // 5 minutes warning
+          });
+          
+          // Add session event listener
+          sessionManager.addEventListener(handleSessionEvent);
         } else {
           setUser(null);
           setRole(null);
@@ -45,7 +60,46 @@ export function AuthProvider({ children }) {
     };
 
     initAuth();
+    
+    // Listen for session expired events
+    const handleSessionExpired = (event) => {
+      console.log('Session expired event received:', event.detail);
+      logout();
+    };
+    
+    document.addEventListener('session:expired', handleSessionExpired);
+    
+    // Cleanup on unmount
+    return () => {
+      document.removeEventListener('session:expired', handleSessionExpired);
+      sessionManager.stopTracking();
+      sessionManager.removeEventListener(handleSessionEvent);
+    };
   }, []);
+  
+  // Handle session events from session manager
+  const handleSessionEvent = (event, data) => {
+    switch (event) {
+      case 'warning':
+        setSessionInfo(prev => ({
+          ...prev,
+          showWarning: true,
+          timeRemaining: data.timeRemaining
+        }));
+        break;
+      case 'timeout':
+        logout();
+        break;
+      case 'extended':
+        setSessionInfo(prev => ({
+          ...prev,
+          showWarning: false
+        }));
+        break;
+      default:
+        break;
+    }
+  };
 
   /**
    * Login with email and password
@@ -192,6 +246,50 @@ export function AuthProvider({ children }) {
     return role.name === roleName;
   };
 
+  /**
+   * Extend the current session
+   * @returns {Object} - Extension result
+   */
+  const extendSession = async () => {
+    try {
+      // Use session manager to extend session
+      const result = await sessionManager.extendSession();
+      
+      // Update session info
+      setSessionInfo(prev => ({
+        ...prev,
+        showWarning: false
+      }));
+      
+      return {
+        success: true,
+        message: 'Session extended successfully'
+      };
+    } catch (error) {
+      console.error('Session extension error:', error);
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  };
+  
+  /**
+   * Get current session information
+   * @returns {Object} - Session information
+   */
+  const getSessionInfo = () => {
+    if (!user) return null;
+    
+    // Get time remaining from session manager
+    const timeRemaining = sessionManager.getTimeRemaining();
+    
+    return {
+      ...sessionInfo,
+      timeRemaining
+    };
+  };
+
   // Context value
   const value = {
     user,
@@ -203,6 +301,9 @@ export function AuthProvider({ children }) {
     logout,
     hasPermission,
     hasRole,
+    extendSession,
+    getSessionInfo,
+    sessionWarning: sessionInfo.showWarning,
     isAuthenticated: !!user
   };
 
